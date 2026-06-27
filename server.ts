@@ -3,16 +3,74 @@ import path from "path";
 import fs from "fs";
 import crypto from "crypto";
 import { createServer as createViteServer } from "vite";
+import cors from "cors";
+import helmet from "helmet";
+import compression from "compression";
+import { rateLimit } from "express-rate-limit";
+import dotenv from "dotenv";
+
+// Load environment variables
+dotenv.config();
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 // Setup directories and JSON Database
-const DB_FILE = path.join(process.cwd(), "db.json");
-const UPLOADS_DIR = path.join(process.cwd(), "uploads");
+const DB_FILE = process.env.DB_FILE_PATH 
+  ? path.resolve(process.env.DB_FILE_PATH) 
+  : path.join(process.cwd(), "db.json");
 
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+const UPLOADS_DIR = process.env.UPLOADS_DIR_PATH 
+  ? path.resolve(process.env.UPLOADS_DIR_PATH) 
+  : path.join(process.cwd(), "uploads");
+
+const EXCEL_DIR = process.env.EXCEL_DIR_PATH 
+  ? path.resolve(process.env.EXCEL_DIR_PATH) 
+  : path.join(process.cwd(), "excel_storage");
+
+const BACKUP_DIR = process.env.BACKUP_DIR_PATH 
+  ? path.resolve(process.env.BACKUP_DIR_PATH) 
+  : path.join(process.cwd(), "backups");
+
+// Ensure all essential directories exist
+[UPLOADS_DIR, EXCEL_DIR, BACKUP_DIR].forEach((dir) => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+});
+
+// Automatic Daily / Configurable Backups
+const ENABLE_BACKUPS = process.env.ENABLE_BACKUPS !== "false";
+const BACKUP_INTERVAL_MS = process.env.BACKUP_INTERVAL_MS 
+  ? parseInt(process.env.BACKUP_INTERVAL_MS, 10) 
+  : 86400000; // default to 24 hours
+
+if (ENABLE_BACKUPS) {
+  setInterval(() => {
+    try {
+      if (fs.existsSync(DB_FILE)) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+        const backupPath = path.join(BACKUP_DIR, `db_backup_${timestamp}.json`);
+        fs.copyFileSync(DB_FILE, backupPath);
+        console.log(`[BACKUP SUCCESS] Created auto backup of database at ${backupPath}`);
+
+        // Rotate backups: Keep only the 10 most recent backups
+        const files = fs.readdirSync(BACKUP_DIR)
+          .filter(f => f.startsWith("db_backup_") && f.endsWith(".json"))
+          .map(f => ({ name: f, time: fs.statSync(path.join(BACKUP_DIR, f)).mtime.getTime() }))
+          .sort((a, b) => b.time - a.time); // newest first
+
+        if (files.length > 10) {
+          files.slice(10).forEach(f => {
+            fs.unlinkSync(path.join(BACKUP_DIR, f.name));
+            console.log(`[BACKUP ROTATION] Cleared old backup file: ${f.name}`);
+          });
+        }
+      }
+    } catch (err) {
+      console.error("[BACKUP ERROR] Automatic backup task failed:", err);
+    }
+  }, BACKUP_INTERVAL_MS);
 }
 
 // Ensure database file exists with initial schema
@@ -75,6 +133,59 @@ function hashPassword(password: string): string {
 }
 
 // Express Middleware
+// 1. Enable gzip compression
+app.use(compression());
+
+// 2. Security headers (Helmet)
+app.use(
+  helmet({
+    contentSecurityPolicy: process.env.NODE_ENV === "production" ? {
+      directives: {
+        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+        "img-src": ["'self'", "data:", "https://api.qrserver.com"],
+        "script-src-attr": ["'unsafe-inline'"],
+      },
+    } : false, // Disable CSP in dev to avoid blocking Vite Dev Server scripts/styles
+    crossOriginEmbedderPolicy: false,
+  })
+);
+
+// 3. Dynamic CORS
+const corsOrigin = process.env.CORS_ORIGIN || "*";
+app.use(
+  cors({
+    origin: corsOrigin === "*" ? "*" : corsOrigin.split(",").map((o) => o.trim()),
+    credentials: true,
+  })
+);
+
+// 4. Custom Request Logger
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on("finish", () => {
+    const duration = Date.now() - start;
+    console.log(
+      `[${new Date().toISOString()}] ${req.method} ${req.originalUrl} - ${res.statusCode} (${duration}ms)`
+    );
+  });
+  next();
+});
+
+// 5. Rate Limiting for APIs
+const apiLimiter = rateLimit({
+  windowMs: process.env.RATE_LIMIT_WINDOW_MS 
+    ? parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) 
+    : 900000, // default 15 minutes
+  max: process.env.RATE_LIMIT_MAX 
+    ? parseInt(process.env.RATE_LIMIT_MAX, 10) 
+    : 1000, // default 1000 requests per window
+  message: { error: "Too many requests from this IP, please try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use("/api", apiLimiter);
+
+// 6. JSON & URL Encoded Body Parsers
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
@@ -372,8 +483,19 @@ app.post("/api/upload", (req, res) => {
 
 app.use("/uploads", express.static(UPLOADS_DIR));
 
+// Centralized Global Error Handling Middleware
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error(`[SERVER ERROR] ${new Date().toISOString()} - ${err.stack || err.message || err}`);
+  const status = err.statusCode || err.status || 500;
+  res.status(status).json({
+    error: {
+      message: err.message || "An unexpected server error occurred.",
+      status
+    }
+  });
+});
 
-// Serve static frontend assets and boot developer server
+// Serve static frontend assets and boot server
 const isProduction = process.env.NODE_ENV === "production";
 
 async function start() {
@@ -392,7 +514,7 @@ async function start() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running at http://0.0.0.0:${PORT} (Production: ${isProduction})`);
+    console.log(`[SERVER START] FormFlow Pro running on http://0.0.0.0:${PORT} (Production: ${isProduction})`);
   });
 }
 

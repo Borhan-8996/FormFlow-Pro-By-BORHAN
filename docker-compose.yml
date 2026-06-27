@@ -1,0 +1,30 @@
+version: "3.8"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: formflow-pro-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - JWT_SECRET=formflow_production_jwt_secret_ultra_secure_keys_2026
+      - CORS_ORIGIN=*
+      - RATE_LIMIT_WINDOW_MS=900000
+      - RATE_LIMIT_MAX=1000
+      - DB_FILE_PATH=/app/data/db.json
+      - UPLOADS_DIR_PATH=/app/data/uploads
+      - EXCEL_DIR_PATH=/app/data/excel_storage
+      - BACKUP_DIR_PATH=/app/data/backups
+      - ENABLE_BACKUPS=true
+      - BACKUP_INTERVAL_MS=86400000
+    volumes:
+      - formflow_prod_data:/app/data
+
+volumes:
+  formflow_prod_data:
+    driver: local
