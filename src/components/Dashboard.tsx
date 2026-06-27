@@ -404,7 +404,13 @@ export default function Dashboard({
                 <tbody className="divide-y divide-slate-800/40 text-sm font-sans">
                   {filteredForms.map((form) => {
                     const basePath = window.location.pathname.split('/form/')[0].replace(/\/$/, "");
-                    const formPublicUrl = `${window.location.origin}${basePath}/form/${form.id}`;
+                    const isStaticHosting = window.location.hostname.includes("github.io") || window.location.hostname.includes("pages.dev");
+                    const formPublicUrl = isStaticHosting
+                      ? `${window.location.origin}${basePath}/?form=${form.id}`
+                      : `${window.location.origin}${basePath}/form/${form.id}`;
+                    const formPreviewUrl = isStaticHosting
+                      ? `${basePath}/?form=${form.id}`
+                      : `${basePath}/form/${form.id}`;
                     return (
                       <tr key={form.id} className="hover:bg-slate-800/20 transition-colors">
                         <td className="py-4 px-4 font-semibold text-slate-200">
@@ -438,7 +444,7 @@ export default function Dashboard({
 
                             {/* Public Link Button */}
                             <a
-                              href={`${basePath}/form/${form.id}`}
+                              href={formPreviewUrl}
                               target="_blank"
                               rel="noreferrer"
                               className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg transition-all"

@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 import { getTranslation } from "../utils/translate";
+import { getApiUrl } from "../utils/api";
 import { Form, Question, QuestionType, FormSettings, FormTheme, QuestionOption } from "../types";
 
 interface FormBuilderProps {
@@ -49,7 +50,7 @@ export default function FormBuilder({ formId, token, onBack, lang }: FormBuilder
   const fetchFormDetails = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/forms/${formId}`, {
+      const res = await fetch(getApiUrl(`/api/forms/${formId}`), {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -57,7 +58,7 @@ export default function FormBuilder({ formId, token, onBack, lang }: FormBuilder
       setForm(data);
 
       // Fetch responses
-      const respRes = await fetch(`/api/forms/${formId}/responses`, {
+      const respRes = await fetch(getApiUrl(`/api/forms/${formId}/responses`), {
         headers: { Authorization: `Bearer ${token}` }
       });
       const respData = await respRes.json();
@@ -74,7 +75,7 @@ export default function FormBuilder({ formId, token, onBack, lang }: FormBuilder
     setSaving(true);
     setMessage("");
     try {
-      const res = await fetch(`/api/forms/${formId}`, {
+      const res = await fetch(getApiUrl(`/api/forms/${formId}`), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -336,9 +337,13 @@ export default function FormBuilder({ formId, token, onBack, lang }: FormBuilder
           {/* Form Preview Option */}
           {(() => {
             const basePath = window.location.pathname.split('/form/')[0].replace(/\/$/, "");
+            const isStaticHosting = window.location.hostname.includes("github.io") || window.location.hostname.includes("pages.dev");
+            const previewUrl = isStaticHosting
+              ? `${basePath}/?form=${form.id}`
+              : `${basePath}/form/${form.id}`;
             return (
               <a
-                href={`${basePath}/form/${form.id}`}
+                href={previewUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white font-semibold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer"

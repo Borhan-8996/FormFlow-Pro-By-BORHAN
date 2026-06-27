@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 import { getTranslation } from "../utils/translate";
+import { getApiUrl } from "../utils/api";
 import { Form, Question, QuestionType, QuestionOption } from "../types";
 import SignaturePad from "./SignaturePad";
 
@@ -61,7 +62,7 @@ export default function FormFiller({ formId, lang, setLang }: FormFillerProps) {
   const fetchPublicForm = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/forms/${formId}/public`);
+      const res = await fetch(getApiUrl(`/api/forms/${formId}/public`));
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setForm(data);
@@ -122,7 +123,7 @@ export default function FormFiller({ formId, lang, setLang }: FormFillerProps) {
       
       // Upload Base64 to server uploads folder
       try {
-        const res = await fetch("/api/upload", {
+        const res = await fetch(getApiUrl("/api/upload"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ fileName: file.name, fileData: base64 })
@@ -160,7 +161,7 @@ export default function FormFiller({ formId, lang, setLang }: FormFillerProps) {
 
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/forms/${formId}/submit`, {
+      const res = await fetch(getApiUrl(`/api/forms/${formId}/submit`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ answers, language: lang })

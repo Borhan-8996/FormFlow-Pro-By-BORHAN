@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Mail, Lock, User, Sparkles } from "lucide-react";
 import { motion } from "motion/react";
 import { getTranslation } from "../utils/translate";
+import { getApiUrl } from "../utils/api";
 
 interface AuthProps {
   onAuthSuccess: (token: string, user: { id: string; name: string; email: string }) => void;
@@ -26,7 +27,7 @@ export default function Auth({ onAuthSuccess, lang, setLang }: AuthProps) {
     const payload = isLogin ? { email, password } : { name, email, password };
 
     try {
-      const res = await fetch(endpoint, {
+      const res = await fetch(getApiUrl(endpoint), {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

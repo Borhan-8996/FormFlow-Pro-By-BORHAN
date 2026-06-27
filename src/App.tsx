@@ -5,6 +5,7 @@ import FormBuilder from "./components/FormBuilder";
 import FormFiller from "./components/FormFiller";
 import FormQRCode from "./components/FormQRCode";
 import { Form, User } from "./types";
+import { getApiUrl } from "./utils/api";
 
 export default function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem("formflow_token"));
@@ -25,13 +26,35 @@ export default function App() {
 
   const [loading, setLoading] = useState(true);
 
-  // Parse path on initial mount to check if it's a public form view
+  // Parse path, query, or hash on initial mount to check if it's a public form view
   useEffect(() => {
+    // 1. Check pathname (e.g., /form/123)
     const path = window.location.pathname;
     const match = path.match(/\/form\/([a-zA-Z0-9_\-]+)/);
     if (match && match[1]) {
       setPublicFormId(match[1]);
+      setLoading(false);
+      return;
     }
+
+    // 2. Check query search parameters (e.g., ?form=123 or ?id=123)
+    const params = new URLSearchParams(window.location.search);
+    const queryFormId = params.get("form") || params.get("id");
+    if (queryFormId) {
+      setPublicFormId(queryFormId);
+      setLoading(false);
+      return;
+    }
+
+    // 3. Check hash (e.g., #/form/123 or #form=123)
+    const hash = window.location.hash;
+    const hashMatch = hash.match(/\/form\/([a-zA-Z0-9_\-]+)/) || hash.match(/form=([a-zA-Z0-9_\-]+)/);
+    if (hashMatch && hashMatch[1]) {
+      setPublicFormId(hashMatch[1]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(false);
   }, []);
 
@@ -48,7 +71,7 @@ export default function App() {
 
       try {
         // Fetch current user
-        const profileRes = await fetch("/api/auth/me", {
+        const profileRes = await fetch(getApiUrl("/api/auth/me"), {
           headers: { Authorization: `Bearer ${token}` }
         });
         const profileData = await profileRes.json();
@@ -58,7 +81,7 @@ export default function App() {
         setUser(profileData.user);
 
         // Fetch user's forms list
-        const formsRes = await fetch("/api/forms", {
+        const formsRes = await fetch(getApiUrl("/api/forms"), {
           headers: { Authorization: `Bearer ${token}` }
         });
         const formsData = await formsRes.json();
@@ -91,7 +114,7 @@ export default function App() {
   const handleCreateForm = async () => {
     if (!token) return;
     try {
-      const res = await fetch("/api/forms", {
+      const res = await fetch(getApiUrl("/api/forms"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -131,7 +154,7 @@ export default function App() {
     }
 
     try {
-      const res = await fetch(`/api/forms/${formId}`, {
+      const res = await fetch(getApiUrl(`/api/forms/${formId}`), {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -174,7 +197,7 @@ export default function App() {
         onBack={() => {
           setEditingFormId(null);
           // Refetch forms to update submission count metrics
-          fetch("/api/forms", {
+          fetch(getApiUrl("/api/forms"), {
             headers: { Authorization: `Bearer ${token}` }
           })
             .then((res) => res.json())
