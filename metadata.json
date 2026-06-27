@@ -1,0 +1,6 @@
+{
+  "name": "FormFlow Pro",
+  "description": "FormFlow Pro is the best form builder and data collection platform by BORHAN. It supports custom themes, drag & drop creation, live Excel sync, QR codes, PDF/Excel exports, multi-language support (EN/BN), and advanced question types.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
