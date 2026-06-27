@@ -58,6 +58,10 @@ export interface FormSettings {
   progressBar?: boolean;
   ipRestriction?: boolean;
   customSubmitText?: string;
+  saveLater?: boolean;
+  autoJump?: boolean;
+  passwordProtect?: boolean;
+  formPassword?: string;
 }
 
 export interface FormTheme {

@@ -194,7 +194,11 @@ app.post("/api/forms", authMiddleware, (req: any, res) => {
       emailNotification: false,
       progressBar: false,
       ipRestriction: false,
-      customSubmitText: ""
+      customSubmitText: "",
+      saveLater: false,
+      autoJump: false,
+      passwordProtect: false,
+      formPassword: ""
     },
     theme: theme || { preset: "dark-glow", glowColor: "indigo" },
     createdAt: new Date().toISOString(),

@@ -307,7 +307,7 @@ export default function FormBuilder({ formId, token, onBack, lang }: FormBuilder
             <input
               type="text"
               value={form.title}
-              onChange={(e) => handleUpdateQuestion("title", { title: e.target.value })}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
               onBlur={() => handleSaveForm(form)}
               className="bg-transparent text-lg font-bold text-white border-b border-transparent hover:border-slate-700 focus:border-indigo-500 focus:outline-none px-1 py-0.5 w-full font-sans transition-all"
             />
@@ -1055,6 +1055,100 @@ export default function FormBuilder({ formId, token, onBack, lang }: FormBuilder
                     />
                     <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600 peer-checked:after:bg-white"></div>
                   </label>
+                </div>
+
+                {/* Save Answers for Later */}
+                <div className="flex items-center justify-between p-4 bg-slate-950/60 border border-slate-800/40 rounded-xl">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-200">Save Answers for Later</h4>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Allow users to auto-save their progress locally and continue later.</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.settings.saveLater || false}
+                      onChange={(e) => {
+                        const updated = {
+                          ...form,
+                          settings: { ...form.settings, saveLater: e.target.checked }
+                        };
+                        setForm(updated);
+                        handleSaveForm(updated);
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600 peer-checked:after:bg-white"></div>
+                  </label>
+                </div>
+
+                {/* Auto-Jump to Next Question */}
+                <div className="flex items-center justify-between p-4 bg-slate-950/60 border border-slate-800/40 rounded-xl">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-200">Auto-Jump to Next Question</h4>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Automatically progress to the next field when selecting choices.</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.settings.autoJump || false}
+                      onChange={(e) => {
+                        const updated = {
+                          ...form,
+                          settings: { ...form.settings, autoJump: e.target.checked }
+                        };
+                        setForm(updated);
+                        handleSaveForm(updated);
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600 peer-checked:after:bg-white"></div>
+                  </label>
+                </div>
+
+                {/* Password Protect Form */}
+                <div className="p-4 bg-slate-950/60 border border-slate-800/40 rounded-xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-200">Password Protect Form</h4>
+                      <p className="text-[10px] text-slate-500 mt-0.5">Require responders to enter a password to view this form.</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={form.settings.passwordProtect || false}
+                        onChange={(e) => {
+                          const updated = {
+                            ...form,
+                            settings: { ...form.settings, passwordProtect: e.target.checked }
+                          };
+                          setForm(updated);
+                          handleSaveForm(updated);
+                        }}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600 peer-checked:after:bg-white"></div>
+                    </label>
+                  </div>
+
+                  {form.settings.passwordProtect && (
+                    <div className="pt-2 border-t border-slate-800/40">
+                      <label className="block text-[10px] font-bold text-slate-400 mb-1">Set Password</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. secret123"
+                        value={form.settings.formPassword || ""}
+                        onChange={(e) => {
+                          const updated = {
+                            ...form,
+                            settings: { ...form.settings, formPassword: e.target.value }
+                          };
+                          setForm(updated);
+                        }}
+                        onBlur={() => handleSaveForm(form)}
+                        className="bg-slate-950 border border-slate-800 text-slate-300 text-xs px-3 py-2 rounded-lg w-full max-w-xs focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

@@ -37,6 +37,10 @@ export default function FormFiller({ formId, lang, setLang }: FormFillerProps) {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
   const [deviceRestrictionError, setDeviceRestrictionError] = useState("");
+  const [showDraftNotification, setShowDraftNotification] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [isUnlocked, setIsUnlocked] = useState(false);
 
   useEffect(() => {
     if (form && form.settings?.ipRestriction) {
@@ -59,6 +63,32 @@ export default function FormFiller({ formId, lang, setLang }: FormFillerProps) {
     fetchPublicForm();
   }, [formId]);
 
+  // Restore draft on mount if saveLater is enabled
+  useEffect(() => {
+    if (form && form.settings?.saveLater) {
+      const savedDraft = localStorage.getItem(`form_draft_${formId}`);
+      if (savedDraft) {
+        try {
+          const parsed = JSON.parse(savedDraft);
+          if (parsed && typeof parsed === "object") {
+            setAnswers(parsed);
+            setShowDraftNotification(true);
+            setTimeout(() => setShowDraftNotification(false), 4000);
+          }
+        } catch (e) {
+          console.error("Error restoring form draft:", e);
+        }
+      }
+    }
+  }, [form, formId]);
+
+  // Auto-save answers draft whenever they change
+  useEffect(() => {
+    if (form && form.settings?.saveLater && Object.keys(answers).length > 0) {
+      localStorage.setItem(`form_draft_${formId}`, JSON.stringify(answers));
+    }
+  }, [answers, form, formId]);
+
   const fetchPublicForm = async () => {
     setLoading(true);
     try {
@@ -74,13 +104,13 @@ export default function FormFiller({ formId, lang, setLang }: FormFillerProps) {
   };
 
   // Evaluate if a question should be shown based on conditional display logic rules
-  const shouldShowQuestion = (q: Question): boolean => {
+  const shouldShowQuestion = (q: Question, currentAnswers = answers): boolean => {
     if (!q.conditionalLogic || !q.conditionalLogic.enabled) return true;
     
     const triggerId = q.conditionalLogic.questionId;
     if (!triggerId) return true;
 
-    const triggerAnswer = answers[triggerId];
+    const triggerAnswer = currentAnswers[triggerId];
     const op = q.conditionalLogic.operator;
     const targetValue = q.conditionalLogic.value?.toLowerCase().trim();
 
@@ -106,11 +136,39 @@ export default function FormFiller({ formId, lang, setLang }: FormFillerProps) {
     return true;
   };
 
-  const handleUpdateAnswer = (questionId: string, value: any) => {
-    setAnswers((prev) => ({
-      ...prev,
+  const handleUpdateAnswer = (questionId: string, value: any, isChoiceSelection?: boolean) => {
+    const updatedAnswers = {
+      ...answers,
       [questionId]: value
-    }));
+    };
+
+    setAnswers(updatedAnswers);
+
+    if (form?.settings?.autoJump && isChoiceSelection) {
+      const currentIndex = form.questions.findIndex((q) => q.id === questionId);
+      if (currentIndex !== -1) {
+        let nextQ = null;
+        for (let i = currentIndex + 1; i < form.questions.length; i++) {
+          const q = form.questions[i];
+          if (q.type !== QuestionType.SECTION && shouldShowQuestion(q, updatedAnswers)) {
+            nextQ = q;
+            break;
+          }
+        }
+        if (nextQ) {
+          setTimeout(() => {
+            const nextElement = document.getElementById(`question-card-${nextQ!.id}`);
+            if (nextElement) {
+              nextElement.scrollIntoView({ behavior: "smooth", block: "center" });
+              const firstInput = nextElement.querySelector("input, select, textarea") as HTMLElement;
+              if (firstInput) {
+                firstInput.focus({ preventScroll: true });
+              }
+            }
+          }, 100);
+        }
+      }
+    }
   };
 
   const handleFileUpload = (questionId: string, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -139,6 +197,16 @@ export default function FormFiller({ formId, lang, setLang }: FormFillerProps) {
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleUnlockForm = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError("");
+    if (passwordInput === (form?.settings?.formPassword || "")) {
+      setIsUnlocked(true);
+    } else {
+      setPasswordError(lang === "BN" ? "ভুল পাসওয়ার্ড! অনুগ্রহ করে আবার চেষ্টা করুন।" : "Incorrect password! Please try again.");
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -171,6 +239,10 @@ export default function FormFiller({ formId, lang, setLang }: FormFillerProps) {
 
       if (form.settings?.ipRestriction) {
         localStorage.setItem(`form_submitted_${formId}`, "true");
+      }
+
+      if (form.settings?.saveLater) {
+        localStorage.removeItem(`form_draft_${formId}`);
       }
 
       if (form.settings?.redirectUrl && form.settings.redirectUrl.trim() !== "") {
@@ -211,6 +283,61 @@ export default function FormFiller({ formId, lang, setLang }: FormFillerProps) {
   }
 
   if (!form) return null;
+
+  if (form.settings?.passwordProtect && !isUnlocked) {
+    const isDarkSetting = form.theme.preset.startsWith("dark") || form.theme.preset === "retro-terminal";
+    return (
+      <div className={`min-h-screen flex items-center justify-center p-4 transition-all ${
+        isDarkSetting ? "bg-[#060814] text-slate-200" : "bg-slate-50 text-slate-800"
+      }`}>
+        <div className={`w-full max-w-md border rounded-2xl p-8 shadow-2xl relative ${
+          isDarkSetting ? "bg-slate-900/60 border-slate-800/80" : "bg-white border-slate-200/80"
+        }`}>
+          <div className="absolute top-0 left-0 w-full h-1.5 bg-indigo-500 rounded-t-2xl"></div>
+          <div className="text-center mb-6">
+            <div className="w-12 h-12 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Lock className="w-5 h-5" />
+            </div>
+            <h3 className="font-sans font-bold text-lg text-white mb-1">
+              {lang === "BN" ? "ফর্মটি পাসওয়ার্ড দ্বারা সুরক্ষিত" : "Password Protected Form"}
+            </h3>
+            <p className="text-xs text-slate-400">
+              {lang === "BN" ? "অনুগ্রহ করে ফর্মটি দেখতে পাসওয়ার্ড প্রদান করুন।" : "Please enter the password to view and submit this form."}
+            </p>
+          </div>
+
+          <form onSubmit={handleUnlockForm} className="space-y-4">
+            <div>
+              <input
+                type="password"
+                placeholder={lang === "BN" ? "পাসওয়ার্ড দিন..." : "Enter password..."}
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                className={`w-full px-4 py-3 rounded-xl border text-xs font-sans focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all ${
+                  isDarkSetting
+                    ? "bg-slate-950/80 border-slate-800/60 text-white placeholder:text-slate-600"
+                    : "bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400"
+                }`}
+              />
+              {passwordError && (
+                <p className="text-[10px] text-red-400 font-sans mt-1.5 flex items-center gap-1">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  <span>{passwordError}</span>
+                </p>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs py-3 rounded-xl shadow-lg hover:shadow-indigo-500/15 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <span>{lang === "BN" ? "ফর্মটি আনলক করুন" : "Unlock Form"}</span>
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   // Render Styling mapping based on active Theme selection
   const { preset, glowColor } = form.theme;
@@ -279,6 +406,14 @@ export default function FormFiller({ formId, lang, setLang }: FormFillerProps) {
 
   return (
     <div className={`min-h-screen ${containerBg} py-12 px-4 relative overflow-hidden transition-colors duration-500`}>
+      {/* Draft Restored Banner */}
+      {showDraftNotification && (
+        <div className="fixed bottom-6 right-6 z-50 bg-indigo-950 border border-indigo-500/30 text-indigo-200 px-4 py-3 rounded-xl text-xs font-semibold shadow-2xl flex items-center gap-2 animate-scale-up">
+          <CheckCircle className="w-4 h-4 text-indigo-400" />
+          <span>{lang === "BN" ? "আপনার আগের খসড়া সফলভাবে পুনরুদ্ধার করা হয়েছে।" : "Your previously saved draft has been restored."}</span>
+        </div>
+      )}
+
       {/* Background radial ambient light for dark presets */}
       {isDark && !isRetro && (
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[35rem] h-[35rem] bg-indigo-500/5 rounded-full blur-[120px] pointer-events-none"></div>
@@ -392,6 +527,7 @@ export default function FormFiller({ formId, lang, setLang }: FormFillerProps) {
 
               return (
                 <motion.div
+                  id={`question-card-${q.id}`}
                   key={q.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -533,7 +669,7 @@ export default function FormFiller({ formId, lang, setLang }: FormFillerProps) {
                               type="radio"
                               name={q.id}
                               checked={answers[q.id] === opt.label}
-                              onChange={() => handleUpdateAnswer(q.id, opt.label)}
+                              onChange={() => handleUpdateAnswer(q.id, opt.label, true)}
                               className="accent-indigo-500 w-4 h-4 shrink-0"
                             />
                             <span className="text-xs text-slate-300 group-hover:text-white transition-colors">{opt.label}</span>
@@ -572,7 +708,7 @@ export default function FormFiller({ formId, lang, setLang }: FormFillerProps) {
                     {q.type === QuestionType.DROPDOWN && (
                       <select
                         value={answers[q.id] || ""}
-                        onChange={(e) => handleUpdateAnswer(q.id, e.target.value)}
+                        onChange={(e) => handleUpdateAnswer(q.id, e.target.value, true)}
                         className={`w-full px-3 py-2.5 rounded-xl border text-xs font-sans focus:outline-none transition-all ${inputClass}`}
                       >
                         <option value="">-- Select Option --</option>
@@ -593,7 +729,7 @@ export default function FormFiller({ formId, lang, setLang }: FormFillerProps) {
                             <button
                               key={opt.id}
                               type="button"
-                              onClick={() => handleUpdateAnswer(q.id, opt.label)}
+                              onClick={() => handleUpdateAnswer(q.id, opt.label, true)}
                               className={`p-3 rounded-xl border-2 text-left flex flex-col items-center gap-2 transition-all cursor-pointer ${
                                 isSelected
                                   ? "border-indigo-500 bg-indigo-500/10 scale-[1.02]"
@@ -626,7 +762,7 @@ export default function FormFiller({ formId, lang, setLang }: FormFillerProps) {
                             <button
                               key={btn.label}
                               type="button"
-                              onClick={() => handleUpdateAnswer(q.id, btn.val)}
+                              onClick={() => handleUpdateAnswer(q.id, btn.val, true)}
                               className={`flex-1 py-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                                 isSel
                                   ? "bg-indigo-600 text-white border-indigo-500 shadow-md"
@@ -649,7 +785,7 @@ export default function FormFiller({ formId, lang, setLang }: FormFillerProps) {
                             <button
                               key={star}
                               type="button"
-                              onClick={() => handleUpdateAnswer(q.id, star)}
+                              onClick={() => handleUpdateAnswer(q.id, star, true)}
                               className="p-1 hover:scale-110 transition-transform cursor-pointer"
                             >
                               <Star
@@ -674,7 +810,7 @@ export default function FormFiller({ formId, lang, setLang }: FormFillerProps) {
                               <button
                                 key={val}
                                 type="button"
-                                onClick={() => handleUpdateAnswer(q.id, val)}
+                                onClick={() => handleUpdateAnswer(q.id, val, true)}
                                 className={`w-8 h-8 rounded-full border text-xs font-mono font-bold transition-all cursor-pointer ${
                                   isSel ? "bg-indigo-600 text-white border-indigo-500" : "border-slate-800 text-slate-400 hover:border-slate-700"
                                 }`}
