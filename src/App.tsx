@@ -28,7 +28,7 @@ export default function App() {
   // Parse path on initial mount to check if it's a public form view
   useEffect(() => {
     const path = window.location.pathname;
-    const match = path.match(/^\/form\/([a-zA-Z0-9_\-]+)/);
+    const match = path.match(/\/form\/([a-zA-Z0-9_\-]+)/);
     if (match && match[1]) {
       setPublicFormId(match[1]);
     }

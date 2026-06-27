@@ -334,15 +334,20 @@ export default function FormBuilder({ formId, token, onBack, lang }: FormBuilder
 
         <div className="flex items-center gap-2 shrink-0">
           {/* Form Preview Option */}
-          <a
-            href={`/form/${form.id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white font-semibold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer"
-          >
-            <Eye className="w-3.5 h-3.5 text-cyan-400" />
-            <span>{lang === "EN" ? "Preview" : "প্রিভিউ"}</span>
-          </a>
+          {(() => {
+            const basePath = window.location.pathname.split('/form/')[0].replace(/\/$/, "");
+            return (
+              <a
+                href={`${basePath}/form/${form.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white font-semibold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <Eye className="w-3.5 h-3.5 text-cyan-400" />
+                <span>{lang === "EN" ? "Preview" : "প্রিভিউ"}</span>
+              </a>
+            );
+          })()}
 
           {/* Save button explicitly */}
           <button
